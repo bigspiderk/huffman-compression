@@ -62,11 +62,11 @@ public class Huffman {
 
     public static void writeTable(FileOutputStream out, HashMap<Integer, String> table) {
         try {
-            out.write(table.size());
+            out.write(table.size()-1);
             StringBuffer bitBuffer = new StringBuffer();
             for (int c : table.keySet()) {
                 bitBuffer.append(intToBin(c));
-                bitBuffer.append(intToBin(table.get(c).length()).substring(0,3));
+                bitBuffer.append(intToBin(table.get(c).length()));
                 bitBuffer.append(table.get(c));
                 while (bitBuffer.length() >= 8) {
                     out.write(binToInt(bitBuffer.substring(0,8)));
@@ -88,7 +88,7 @@ public class Huffman {
     public static HashMap<String, Integer> parseTable(FileInputStream in) {
         HashMap<String, Integer> table = new HashMap<String, Integer>();
         try {
-            int tableSize = in.read();
+            int tableSize = in.read() + 1;
             StringBuffer bitBuffer = new StringBuffer();
             for (int i = 0; i < tableSize; i++) {
                 if (bitBuffer.length() < 8) {
@@ -96,12 +96,12 @@ public class Huffman {
                 }
                 char c = (char) binToInt(bitBuffer.substring(0,8));
                 bitBuffer.delete(0, 8);
-                if (bitBuffer.length() < 3) {
+                if (bitBuffer.length() < 8) {
                     bitBuffer.append(intToBin(in.read()));
                 }
-                int codeSize = binToInt(bitBuffer.substring(0,3));
-                bitBuffer.delete(0, 3);
-                if (bitBuffer.length() < codeSize) {
+                int codeSize = binToInt(bitBuffer.substring(0,8));
+                bitBuffer.delete(0, 8);
+                while (bitBuffer.length() < codeSize) {
                     bitBuffer.append(intToBin(in.read()));
                 }
                 table.put(bitBuffer.substring(0, codeSize), (int) c);
@@ -112,16 +112,6 @@ public class Huffman {
         }
         
         return table;
-    }
-
-    public static ArrayList<String> generateCodes(int len) {
-        ArrayList<String> codes = new ArrayList<String>();
-
-        for (int i = 0; i < Math.pow(2, len); i++) {
-            codes.add(intToBin(i).substring(0, len));
-        }
-
-        return codes;
     }
 
 
@@ -173,21 +163,6 @@ public class Huffman {
             }
         }
 
-        if (table.size() < 3) {
-            table = new HashMap<Integer, String>();
-            sort(leaves);
-    
-            ArrayList<String> codes = new ArrayList<String>();
-            for (int i = 1; i < 7; i++) {
-                if (generateCodes(i).size() <= leaves.size()) {
-                    codes = generateCodes(i);
-                }
-            }
-            
-            for (int i = 0; i < codes.size(); i++) {
-                table.put((int) leaves.get(leaves.size()-i-1).getChar(), codes.get(codes.size()-i-1));
-            }
-        }
 
         FileOutputStream out = new FileOutputStream(file + ".comp");
         writeTable(out, table);
@@ -203,11 +178,7 @@ public class Huffman {
         int b;
         while ((b = in.read()) != -1) {
             if (table.containsKey(b)) {
-                sb.append(1);
                 sb.append(table.get(b));
-            } else {
-                sb.append(0);
-                sb.append(intToBin(b));
             }
 
             while (sb.length() >= 8) {
@@ -244,38 +215,25 @@ public class Huffman {
         bitBuffer.append(intToBin(in.read()));
 
         while (bitBuffer.length() > 0) {
-            boolean inTable = bitBuffer.charAt(0) == '1';
-            bitBuffer.deleteCharAt(0);
-            if (inTable) {
-                StringBuilder currentCode = new StringBuilder();
-                while (!table.containsKey(currentCode.toString())) {
-                    try{
-                        if (bitBuffer.length() < 1) {
-                            bitBuffer.append(intToBin(in.read()));
-                        }
-                        currentCode.append(bitBuffer.charAt(0));
-                        bitBuffer.deleteCharAt(0);
-                    } catch (StringIndexOutOfBoundsException e2) {
-                        currentCode = null;
-                        break;
-                    }
-                }
-
-                if (currentCode != null) {
-                    out.write(table.get(currentCode.toString()));
+            StringBuilder currentCode = new StringBuilder();
+            while (!table.containsKey(currentCode.toString())) {
+                try{
                     if (bitBuffer.length() < 1) {
                         bitBuffer.append(intToBin(in.read()));
                     }
+                    currentCode.append(bitBuffer.charAt(0));
+                    bitBuffer.deleteCharAt(0);
+                } catch (StringIndexOutOfBoundsException e2) {
+                    currentCode = null;
+                    break;
                 }
+            }
 
-            } else {
-                try{
-                    if (bitBuffer.length() < 8) {
-                        bitBuffer.append(intToBin(in.read()));
-                    }
-                    out.write(binToInt(bitBuffer.substring(0,8)));
-                    bitBuffer.delete(0, 8);
-                } catch (StringIndexOutOfBoundsException ignored) {}
+            if (currentCode != null) {
+                out.write(table.get(currentCode.toString()));
+                if (bitBuffer.length() < 1) {
+                    bitBuffer.append(intToBin(in.read()));
+                }
             }
             
             if (bitBuffer.length() < 8) {
@@ -355,10 +313,6 @@ class Node {
     private String getPath(StringBuilder path) {
         if (parent == null) {
             return path.toString();
-        }
-
-        if (path.length() == 7) {
-            return null;
         }
 
         path.insert(0, position);
